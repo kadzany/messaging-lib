@@ -1,47 +1,55 @@
 package main
 
 import (
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
+	"encoding/json"
 
-	i "github.com/kadzany/messaging-lib/internal"
-	m "github.com/kadzany/messaging-lib/model"
-	p "github.com/kadzany/messaging-lib/pkg"
+	message "github.com/kadzany/messaging-lib/message"
 )
 
+type User struct {
+	Name  string `json:"name"`
+	Age   int    `json:"age"`
+	Phone string `json:"phone"`
+}
+type Data struct {
+	Test string `json:"test"`
+	Data User   `json:"user"`
+}
+
 func main() {
-	db := p.ConnectDB()
-	defer db.Close()
+	cfg := message.Config(message.Cfg{
+		Sasl:    false,
+		Topics:  []string{"test"},
+		GroupID: "test-inbox",
+		Conn: message.DSNConnection{
+			Host: "localhost",
+			Port: "5432",
+			User: "admin",
+			Pass: "password",
+			Name: "sandbox_pii",
+		},
+	})
 
-	err := p.CreateSchema(db)
+	message, err := message.Open([]string{"localhost:9092"}, cfg)
 	if err != nil {
-		log.Fatalf("Error creating schema: %v", err)
+		panic(err)
 	}
 
-	// Example of inserting an outbox message
-	outboxMessage := &m.Outbox{
-		MessagePayload: "Sample outbound message",
-		Status:         "WAITING",
-		TopicName:      "sample-outbound-topic",
+	data := Data{
+		Test: "test",
+		Data: User{
+			Name:  "sample",
+			Age:   20,
+			Phone: "08123456789",
+		},
 	}
-	_, err = db.Model(outboxMessage).Insert()
+
+	payload, err := json.Marshal(data)
 	if err != nil {
-		log.Fatalf("Error inserting outbox message: %v", err)
+		panic(err)
 	}
 
-	// Process outbox messages
-	brokers := []string{"localhost:9092"}
-	i.ProcessOutboxMessages(db, brokers)
-
-	// Start consuming inbound messages
-	i.ConsumeMessages(db, brokers, []string{"sample-inbound-topic"}, "group1")
-
-	// Handle OS signals
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-
-	log.Println("Shutting down gracefully")
+	if err := message.Outbox.Save("test", "key-test", payload); err != nil {
+		panic(err)
+	}
 }
