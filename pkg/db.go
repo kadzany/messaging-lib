@@ -3,9 +3,11 @@ package pkg
 import (
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
-	m "github.com/kadzany/messaging-lib/model"
+	"github.com/kadzany/messaging-lib/inbox"
+	"github.com/kadzany/messaging-lib/outbox"
 )
 
+// deprecated function to connect to database
 func ConnectDB() *pg.DB {
 	db := pg.Connect(&pg.Options{
 		Addr:     "localhost:5432",
@@ -16,10 +18,11 @@ func ConnectDB() *pg.DB {
 	return db
 }
 
+// deprecated function to create schema in database
 func CreateSchema(db *pg.DB) error {
 	models := []interface{}{
-		(*m.Inbox)(nil),
-		(*m.Outbox)(nil),
+		(*inbox.Inboxes)(nil),
+		(*outbox.Outboxes)(nil),
 	}
 	for _, model := range models {
 		err := db.Model(model).CreateTable(&orm.CreateTableOptions{
