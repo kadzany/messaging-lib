@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"time"
 
 	message "github.com/kadzany/messaging-lib/message"
 )
@@ -17,39 +17,38 @@ type Data struct {
 }
 
 func main() {
-	cfg := message.Config(message.Cfg{
-		Sasl:    false,
-		Topics:  []string{"test"},
-		GroupID: "test-inbox",
-		Conn: message.DSNConnection{
-			Host: "localhost",
-			Port: "5432",
-			User: "admin",
-			Pass: "password",
-			Name: "sandbox_pii",
-		},
+	m, err := message.Open([]string{"localhost:9092"}, &message.Config{
+		Sasl:        false,
+		WorkerCount: 1,
+		BatchSize:   1,
 	})
-
-	message, err := message.Open([]string{"localhost:9092"}, cfg)
 	if err != nil {
 		panic(err)
 	}
 
-	data := Data{
-		Test: "test",
-		Data: User{
-			Name:  "sample",
-			Age:   20,
-			Phone: "08123456789",
-		},
-	}
+	m.SendWebhook(message.SendWebhookPayload{
+		Action:      "test",
+		ModuleType:  "test",
+		ProductId:   "test",
+		SendingDate: time.Now(),
+		Data:        nil,
+	}, message.V4)
 
-	payload, err := json.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
+	// data := Data{
+	// 	Test: "test",
+	// 	Data: User{
+	// 		Name:  "sample",
+	// 		Age:   20,
+	// 		Phone: "08123456789",
+	// 	},
+	// }
 
-	if err := message.Outbox.Save("test", "key-test", payload); err != nil {
-		panic(err)
-	}
+	// payload, err := json.Marshal(data)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// if err := message.Outbox.Save("test", "key-test", payload); err != nil {
+	// 	panic(err)
+	// }
 }
