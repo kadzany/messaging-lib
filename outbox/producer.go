@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"sync"
@@ -77,6 +78,31 @@ func (p *Outbox) Save(topic string, key string, data []byte) error {
 		IsDeliver: false,
 	}
 	_, err := p.db.Model(outbox).Insert()
+	return err
+}
+
+func (p *Outbox) SaveTx(tx *sql.Tx, topic string, key string, data []byte) error {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return err
+	}
+
+	outbox := &Outboxes{
+		ID:        uuid.NewString(),
+		Payload:   payload,
+		Key:       key,
+		Topic:     topic,
+		CreatedAt: time.Now(),
+		IsDeliver: false,
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO outboxes (id, payload, key, topic, created_at, is_deliver) VALUES ($1, $2, $3, $4, $5, $6)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(outbox.ID, outbox.Payload, outbox.Key, outbox.Topic, outbox.CreatedAt, outbox.IsDeliver)
 	return err
 }
 

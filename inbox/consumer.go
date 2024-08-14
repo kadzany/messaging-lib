@@ -2,6 +2,7 @@ package inbox
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/go-pg/pg"
+	"github.com/google/uuid"
 	"github.com/kadzany/messaging-lib/common"
 )
 
@@ -89,14 +91,11 @@ func NewSub(db *pg.DB, opt ...Opts) *Inbox {
 	return i
 }
 
-func (i *Inbox) Handler(handler MessageHandler) *Inbox {
-	i.inboxManager.handler = handler
-	return i
-}
-
-func (i *Inbox) Start(ctx context.Context) (err error) {
+func (i *Inbox) Start(ctx context.Context, handler MessageHandler) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	i.inboxManager.handler = handler
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -132,17 +131,47 @@ func (i *Inbox) processBatches(ctx context.Context) {
 	for {
 		select {
 		case batch := <-i.multiBatchConfig.BufChan:
-			for _, msg := range batch {
-				commonMsg := common.Message{
-					Topic:   msg.Message.Topic,
-					Key:     string(msg.Message.Key),
-					Payload: msg.Message.Value,
-				}
-				if err := i.inboxManager.ProcessMessage(ctx, commonMsg); err != nil {
-					log.Println("Error processing message: ", err)
-				} else {
+			err := i.inboxManager.db.RunInTransaction(func(tx *pg.Tx) error {
+				for _, msg := range batch {
+					var payload map[string]interface{}
+					if err := json.Unmarshal(msg.Message.Value, &payload); err != nil {
+						return err
+					}
+					inboxMsg := &Inboxes{
+						ID:        uuid.NewString(),
+						Payload:   payload,
+						Topic:     msg.Message.Topic,
+						Status:    "pending",
+						CreatedAt: time.Now(),
+					}
+
+					if _, err := tx.Model(inboxMsg).Insert(); err != nil {
+						return err
+					}
+
+					commonMsg := common.Message{
+						Topic:   msg.Message.Topic,
+						Key:     string(msg.Message.Key),
+						Payload: msg.Message.Value,
+					}
+					// create request
+					if err := i.inboxManager.ProcessMessage(ctx, commonMsg); err != nil {
+						inboxMsg.Status = "failed"
+					} else {
+						inboxMsg.Status = "processed"
+					}
+
+					// response from request
 					msg.Session.MarkMessage(msg.Message, "")
+					inboxMsg.ProcessedAt = time.Now()
+					if _, err := tx.Model(inboxMsg).WherePK().Update(); err != nil {
+						return err
+					}
 				}
+				return nil
+			})
+			if err != nil {
+				log.Println("Error processing batch: ", err)
 			}
 		case <-ctx.Done():
 			return
