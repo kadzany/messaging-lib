@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	message "github.com/kadzany/messaging-lib/message"
 )
 
@@ -16,8 +14,20 @@ type Data struct {
 	Data User   `json:"user"`
 }
 
+type Provisioning struct {
+	Citem          string                 `json:"citem"`
+	Customer       map[string]interface{} `json:"customer"`
+	ServiceId      string                 `json:"service_id"`
+	OrderNumber    string                 `json:"order_number"`
+	ServiceName    string                 `json:"service_name"`
+	SourceOrder    string                 `json:"source_order"`
+	ActivationId   string                 `json:"activation_id"`
+	SerialNumbers  []string               `json:"serial_numbers"`
+	ActivationData string                 `json:"activation_data"`
+}
+
 func main() {
-	m, err := message.Open([]string{"localhost:9092"}, &message.Config{
+	_, err := message.Open([]string{"localhost:9092"}, &message.Config{
 		Sasl:        false,
 		WorkerCount: 1,
 		BatchSize:   1,
@@ -25,14 +35,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	m.SendWebhook(message.SendWebhookPayload{
-		Action:      "test",
-		ModuleType:  "test",
-		ProductId:   "test",
-		SendingDate: time.Now(),
-		Data:        nil,
-	}, message.V4)
 
 	// data := Data{
 	// 	Test: "test",

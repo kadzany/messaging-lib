@@ -1,8 +1,10 @@
 package message
 
 import (
+	"context"
 	"fmt"
-	"time"
+
+	httpclient "github.com/kadzany/messaging-lib/http-client"
 )
 
 type ApiVersioning int
@@ -18,36 +20,23 @@ func (a ApiVersioning) String() string {
 	return [...]string{"v1", "v2", "v3", "v4"}[a-1]
 }
 
-type CreateWebhookEntity struct {
-	AppUserId   string
-	AppUserCode string
-	ModuleType  string
-	ProductId   string
-	ProductName string
-	Method      string
-	Url         string
-	AuthType    string
-	BaUsername  string
-	BaPassword  string
-	AppName     string
-}
-
-func (m Message) CreateWebhook(payload CreateWebhookEntity) (err error) {
-	return nil
-}
-
 type SendWebhookPayload struct {
-	Action      string    `json:"action"`
-	ModuleType  string    `json:"module_type"`
-	ProductId   string    `json:"product_id"`
-	SendingDate time.Time `json:"sending_date"`
-	Data        any       `json:"data"`
+	Action      string `json:"action"`
+	ModuleType  string `json:"module_type"`
+	ProductId   string `json:"product_id"`
+	SendingDate string `json:"sending_date"`
+	Data        any    `json:"data"`
 }
 
-func (m Message) SendWebhook(payload SendWebhookPayload, version ApiVersioning) (err error) {
-	fmt.Println("Send webhook")
-	fmt.Println("Action: ", payload.Action)
-	fmt.Println("url", *m.WebhookUrl)
-	fmt.Println(version.String())
-	return nil
+func (m Message) SendWebhook(ctx context.Context, payload SendWebhookPayload, version ApiVersioning) (data []byte, err error) {
+	path := fmt.Sprintf("/%s/%s", version.String(), "webhook-requests")
+	client := httpclient.NewClient(*m.WebhookUrl)
+	data, err = client.Post(ctx, path,
+		httpclient.WithAuthorization("Authorization", fmt.Sprintf("apiKey %s", *m.ApiKey)),
+		httpclient.WithJSONBody(payload),
+	)
+	if err != nil {
+		return
+	}
+	return
 }

@@ -154,11 +154,14 @@ func (i *Inbox) processBatches(ctx context.Context) {
 						Key:     string(msg.Message.Key),
 						Payload: msg.Message.Value,
 					}
+					// create request
 					if err := i.inboxManager.ProcessMessage(ctx, commonMsg); err != nil {
 						inboxMsg.Status = "failed"
 					} else {
 						inboxMsg.Status = "processed"
 					}
+
+					// response from request
 					msg.Session.MarkMessage(msg.Message, "")
 					inboxMsg.ProcessedAt = time.Now()
 					if _, err := tx.Model(inboxMsg).WherePK().Update(); err != nil {

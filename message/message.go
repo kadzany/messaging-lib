@@ -26,7 +26,9 @@ type Message struct {
 	db        *pg.DB
 	srmConfig *sarama.Config
 
-	WebhookUrl  *string   `env:"WEBHOOK_BASE_URL" json:"webhook_url"`
+	WebhookUrl *string `env:"WEBHOOK_BASE_URL" json:"webhook_url"`
+	ApiKey     *string `env:"WEBHOOK_API_KEY" json:"api_key"`
+
 	Host        *string   `env:"PG_HOST" json:"db_host"`
 	Port        *string   `env:"PG_PORT" json:"db_port"`
 	User        *string   `env:"PG_USER" json:"db_user"`
